@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -39,6 +41,7 @@ class Net(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         self.fc1 = nn.Linear(1600, 512, bias=False)
+        print(self.fc1.weight.shape)
         self.fc2 = nn.Linear(512, 10, bias=False)
 
     def forward(self, x):
@@ -113,10 +116,24 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
+print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+
+idx = 0
+weights = {}
+weights['weights'] = {}
 for module in net.modules():
     if type(module) != Net and type(module) != nn.MaxPool2d:
-        print(module.weight.shape)
+        weight = module.weight
+        if type(module) == nn.Linear:
+            weight = weight.t()
+        print("module.weight.shape ", weight.shape)
+        weights['weights']['layer_' + str(idx)] = {}
+        weights['weights']['layer_' + str(idx)]['shape'] = weight.shape
+        weights['weights']['layer_' + str(idx)]['value'] = weight.reshape(np.prod(np.array(weight.shape)),).tolist()
+        idx += 1
 
-print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+print(weights)
+with open('weights.json', 'w') as outfile:
+    json.dump(weights, outfile)
 
 
