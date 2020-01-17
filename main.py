@@ -33,16 +33,16 @@ classes = ('plane', 'car', 'bird', 'cat',
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3, bias=False)
-        self.conv2 = nn.Conv2d(32, 32, 3, bias=False)
-        self.conv3 = nn.Conv2d(32, 64, 3, bias=False)
-        self.conv4 = nn.Conv2d(64, 64, 3, bias=False)
+        self.conv1 = nn.Conv2d(3, 32, 3)
+        self.conv2 = nn.Conv2d(32, 32, 3)
+        self.conv3 = nn.Conv2d(32, 64, 3)
+        self.conv4 = nn.Conv2d(64, 64, 3)
 
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.fc1 = nn.Linear(1600, 512, bias=False)
+        self.fc1 = nn.Linear(1600, 512)
         print(self.fc1.weight.shape)
-        self.fc2 = nn.Linear(512, 10, bias=False)
+        self.fc2 = nn.Linear(512, 10)
 
     def forward(self, x):
         # Layer 0
@@ -70,17 +70,24 @@ class Net(nn.Module):
         return x
 
 
+def imshow(img):
+    img = img / 2 + 0.5     # unnormalize
+    npimg = (img.numpy() * 255).astype("int")
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
+
+
 net = Net()
 
 PATH = './cifar_net.pth'
 net.load_state_dict(torch.load(PATH))
-
+#
 isTrain = False
 if isTrain:
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
-    for epoch in range(1):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         total = 0
@@ -116,7 +123,7 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+print('Accuracy of the network on the 10000 test images: %f %%' % (float(correct) / total))
 
 idx = 0
 weights = {}
@@ -126,13 +133,30 @@ for module in net.modules():
         weight = module.weight
         if type(module) == nn.Linear:
             weight = weight.t()
-        print("module.weight.shape ", weight.shape)
         weights['weights']['layer_' + str(idx)] = {}
-        weights['weights']['layer_' + str(idx)]['shape'] = weight.shape
-        weights['weights']['layer_' + str(idx)]['value'] = weight.reshape(np.prod(np.array(weight.shape)),).tolist()
+
+        weights['weights']['layer_' + str(idx)]["weight"] = {}
+        weights['weights']['layer_' + str(idx)]["weight"]['shape'] = weight.shape
+        weights['weights']['layer_' + str(idx)]["weight"]['value'] = weight.reshape(np.prod(np.array(weight.shape)),).tolist()
+
+        weights['weights']['layer_' + str(idx)]["bias"] = {}
+        if module.bias is not None:
+            bias = module.bias
+            bias = bias.unsqueeze(0)
+            if type(module) == nn.Conv2d:
+                bias = bias.unsqueeze(-1)
+                bias = bias.unsqueeze(-1)
+                bias = bias.repeat(1, 1, weight.shape[2], weight.shape[3])
+            print('layer_' + str(idx), weight.shape, bias.shape)
+            weights['weights']['layer_' + str(idx)]["bias"]['shape'] = bias.shape
+            weights['weights']['layer_' + str(idx)]["bias"]['value'] = bias.reshape(np.prod(np.array(bias.shape)), ).tolist()
+        else:
+            print('layer_' + str(idx), weight.shape)
+            weights['weights']['layer_' + str(idx)]["bias"]['shape'] = []
+            weights['weights']['layer_' + str(idx)]["bias"]['value'] = []
+
         idx += 1
 
-print(weights)
 with open('weights.json', 'w') as outfile:
     json.dump(weights, outfile)
 
