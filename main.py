@@ -11,6 +11,9 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 
+from optimizer import PlainRAdam
+
+batch_size = 100
 
 transform = transforms.Compose(
     [transforms.ToTensor(),
@@ -18,12 +21,12 @@ transform = transforms.Compose(
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=100,
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                        download=True, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100,
+testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
                                          shuffle=False, num_workers=2)
 
 classes = ('plane', 'car', 'bird', 'cat',
@@ -33,31 +36,42 @@ classes = ('plane', 'car', 'bird', 'cat',
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3)
-        self.conv2 = nn.Conv2d(32, 32, 3)
-        self.conv3 = nn.Conv2d(32, 64, 3)
-        self.conv4 = nn.Conv2d(64, 64, 3)
+        self.conv1 = nn.Conv2d(3, 32, 3, bias=False)
+        self.conv2 = nn.Conv2d(32, 32, 3, bias=False)
+        self.conv3 = nn.Conv2d(32, 64, 3, bias=False)
+        self.conv4 = nn.Conv2d(64, 64, 3, bias=False)
 
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.fc1 = nn.Linear(1600, 512)
-        print(self.fc1.weight.shape)
-        self.fc2 = nn.Linear(512, 10)
+        self.fc1 = nn.Linear(1600, 512, bias=False)
+        self.fc2 = nn.Linear(512, 10, bias=False)
 
-    def forward(self, x):
-        # Layer 0
+    def conv_module(self, x):
+        shapes = []
+
         x = F.relu(self.conv1(x))
+        shapes.append(x.shape)
 
         # Layer 1
-        x = self.pool(F.relu(self.conv2(x)))
+        x = F.relu(self.conv2(x))
+        shapes.append(x.shape)
+        x = self.pool(x)
         x = nn.Dropout(0.25)(x)
 
         # Layer 2
         x = F.relu(self.conv3(x))
+        shapes.append(x.shape)
 
         # Layer 3
-        x = self.pool(F.relu(self.conv4(x)))
+        x = F.relu(self.conv4(x))
+        shapes.append(x.shape)
+        x = self.pool(x)
         x = nn.Dropout(0.25)(x)
+
+        return x, shapes
+
+    def forward(self, x):
+        x, _ = self.conv_module(x)
 
         x = x.view(-1, 1600)
 
@@ -76,18 +90,18 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
-
 net = Net()
 
 PATH = './cifar_net.pth'
 net.load_state_dict(torch.load(PATH))
 #
-isTrain = False
+isTrain = True
+
 if isTrain:
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = PlainRAdam(net.parameters())
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(5):  # loop over the dataset multiple times
 
         running_loss = 0.0
         total = 0
@@ -128,6 +142,9 @@ print('Accuracy of the network on the 10000 test images: %f %%' % (float(correct
 idx = 0
 weights = {}
 weights['weights'] = {}
+_, shapes = net.conv_module(torch.zeros(batch_size, 3, 32, 32))
+conv_count = 0
+
 for module in net.modules():
     if type(module) != Net and type(module) != nn.MaxPool2d:
         weight = module.weight
@@ -146,7 +163,11 @@ for module in net.modules():
             if type(module) == nn.Conv2d:
                 bias = bias.unsqueeze(-1)
                 bias = bias.unsqueeze(-1)
-                bias = bias.repeat(1, 1, weight.shape[2], weight.shape[3])
+                output_shape = shapes[conv_count]
+                bias = bias.repeat(batch_size, 1, output_shape[2], output_shape[3])
+                conv_count += 1
+            else:
+                bias = bias.repeat(batch_size, 1)
             print('layer_' + str(idx), weight.shape, bias.shape)
             weights['weights']['layer_' + str(idx)]["bias"]['shape'] = bias.shape
             weights['weights']['layer_' + str(idx)]["bias"]['value'] = bias.reshape(np.prod(np.array(bias.shape)), ).tolist()
