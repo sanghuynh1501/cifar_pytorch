@@ -95,7 +95,7 @@ net = Net()
 PATH = './cifar_net.pth'
 net.load_state_dict(torch.load(PATH))
 #
-isTrain = True
+isTrain = False
 
 if isTrain:
     criterion = nn.CrossEntropyLoss()
