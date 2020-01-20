@@ -156,8 +156,8 @@ if __name__ == "__main__":
     """show it works"""
 
     net = VGG('VGG16')
-    PATH = './cifar_net.pth'
-    net.load_state_dict(torch.load(PATH))
+    # PATH = './cifar_net.pth'
+    # net.load_state_dict(torch.load(PATH))
 
     criterion = nn.CrossEntropyLoss()
     optimizer = PlainRAdam(net.parameters())
