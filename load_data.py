@@ -15,15 +15,15 @@ def load_cifar_10_data():
     x_test = []
     y_test = []
 
-    for file_name in os.listdir("/home/sang/cifar/train"):
-        image = np.array(Image.open("/home/sang/cifar/train/" + file_name))
+    for file_name in os.listdir("data/cifar/train"):
+        image = np.array(Image.open("data/cifar/train/" + file_name))
         image = image.reshape((3, 32, 32))
         image = image.astype(np.float64) / 255
         x_train.append(image)
         y_train.append(classes.index(file_name.split(".")[0].split("_")[1]))
 
-    for file_name in os.listdir("/home/sang/cifar/test"):
-        image = np.array(Image.open("/home/sang/cifar/test/" + file_name))
+    for file_name in os.listdir("data/cifar/test"):
+        image = np.array(Image.open("data/cifar/test/" + file_name))
         image = image.reshape((3, 32, 32))
         image = image.astype(np.float64) / 255
         x_test.append(image)
