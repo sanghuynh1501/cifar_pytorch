@@ -16,11 +16,11 @@ from optimizer import PlainRAdam
 from load_data import load_cifar_10_data, generation_data
 
 batch_size = 32
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 classes = ('airplane', 'automobile', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-net = VGG('VGG13')
+net = VGG('VGG13').to(device)
 summary(net, (3, 32, 32))
 PATH = './cifar_net.pth'
 net.load_state_dict(torch.load(PATH))
@@ -36,6 +36,29 @@ print("Test labels: ", test_labels.shape)
 criterion = nn.CrossEntropyLoss()
 optimizer = PlainRAdam(net.parameters())
 
+def evaluate(net):
+    correct = 0
+    total = 0
+    dem = 0
+    
+    net.eval()
+    with torch.no_grad():
+        with tqdm(total=10000) as pbar:
+            for data in generation_data(batch_size, test_data, test_labels):
+                images, labels = data
+                inputs = torch.from_numpy(images).float().to(device)
+                labels = torch.from_numpy(labels).to(device)
+                outputs = net(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                dem += batch_size
+                pbar.update(batch_size)
+
+    print('Accuracy of the network on the 10000 test images: %f %%' % (float(correct) / total))
+
+
+
 for epoch in range(15):  # loop over the dataset multiple times
 
     running_loss = 0.0
@@ -44,8 +67,8 @@ for epoch in range(15):  # loop over the dataset multiple times
         for i, data in enumerate(generation_data(batch_size, train_data, train_labels), 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs = torch.from_numpy(inputs).float()
-            labels = torch.from_numpy(labels)
+            inputs = torch.from_numpy(inputs).float().to(device)
+            labels = torch.from_numpy(labels).to(device)
 
             # # zero the parameter gradients
             optimizer.zero_grad()
@@ -65,24 +88,8 @@ for epoch in range(15):  # loop over the dataset multiple times
           (epoch + 1, running_loss / total))
 
     print('Finished Training')
+    evaluate(net)
     torch.save(net.state_dict(), PATH)
 
-correct = 0
-total = 0
-dem = 0
 
-net.eval()
-with torch.no_grad():
-    with tqdm(total=10000) as pbar:
-      for data in generation_data(batch_size, test_data, test_labels):
-          images, labels = data
-          inputs = torch.from_numpy(images).float()
-          labels = torch.from_numpy(labels)
-          outputs = net(inputs)
-          _, predicted = torch.max(outputs.data, 1)
-          total += labels.size(0)
-          correct += (predicted == labels).sum().item()
-          dem += batch_size
-          pbar.update(1)
 
-print('Accuracy of the network on the 10000 test images: %f %%' % (float(correct) / total))
