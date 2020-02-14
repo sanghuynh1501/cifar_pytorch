@@ -1,3 +1,4 @@
+
 import json
 import torch
 import torch.nn as nn
@@ -6,10 +7,15 @@ import numpy as np
 from model import VGG
 from torchsummary import summary
 
+if torch.cuda.is_available():
+    map_location=lambda storage, loc: storage.cuda()
+else:
+    map_location='cpu'
+
 net = VGG('VGG13')
 summary(net, (3, 32, 32))
 PATH = './cifar_net.pth'
-net.load_state_dict(torch.load(PATH))
+net.load_state_dict(torch.load(PATH, map_location))
 
 idx = 0
 weights = {}
